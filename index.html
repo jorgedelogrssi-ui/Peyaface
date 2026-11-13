@@ -1,0 +1,1094 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Peya Face</title>
+<style>
+  :root{
+    --bg1:#2a5298;
+    --bg2:#1e3c72;
+    --panel:#ffffff;
+    --accent:#ff6b6b;
+    --accent2:#4ecdc4;
+    --text:#26324a;
+  }
+  *{box-sizing:border-box;}
+  html, body{
+    margin:0;height:100%;overflow:hidden;
+    font-family:-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;
+    background:#fff;
+    color:var(--text);
+  }
+  .app{width:100vw;height:100vh;position:relative;}
+  header{display:none;}
+
+  .stage-wrap{
+    width:100vw;height:100vh;margin:0;border-radius:0;
+    background:#fff;
+    position:relative;overflow:hidden;
+  }
+  .stage-wrap img, .stage-wrap video{
+    position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center top;
+    background:#fff;
+    transition:opacity 0.25s ease;
+  }
+  #idle-img{opacity:1;}
+  #action-video{opacity:0;}
+
+  .panel{
+    position:fixed;right:16px;bottom:90px;left:auto;
+    background:transparent;box-shadow:none;padding:0;margin:0;z-index:10;
+  }
+  .mic-row{display:flex;flex-direction:column;align-items:center;gap:0;}
+  #mic-btn{
+    width:60px;height:60px;border-radius:50%;border:none;
+    background:linear-gradient(135deg, #e53935, #c62828);color:#fff;font-size:1.6rem;
+    cursor:pointer;flex-shrink:0;transition:transform 0.15s ease, box-shadow 0.2s ease;
+    box-shadow:0 6px 18px rgba(229,57,53,0.5);
+  }
+  #mic-btn.listening{background:linear-gradient(135deg, #43a047, #2e7d32);transform:scale(1.08);box-shadow:0 6px 22px rgba(67,160,71,0.6);}
+  #lang-btn{
+    display:inline-flex;align-items:center;gap:7px;
+    margin-bottom:8px;min-width:44px;padding:6px 10px;border-radius:14px;border:none;
+    background:rgba(0,0,0,0.55);color:#fff;font-size:0.8rem;font-weight:bold;letter-spacing:0.5px;
+    cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,0.3);
+  }
+  #lang-btn:active{transform:scale(0.95);}
+  #mic-status{display:none;}
+  .chips{display:none;}
+  .chip:active{background:var(--accent2);color:#fff;}
+  .plan-box{
+    position:fixed;top:10px;right:10px;z-index:10;
+    background:rgba(0,0,0,0.5);border-radius:10px;padding:5px 10px;text-align:center;
+  }
+  .plan-box .dias-restantes{font-size:0.75rem;font-weight:bold;color:#fff;}
+  .bloqueo-overlay{
+    position:fixed;inset:0;background:rgba(20,25,45,0.96);z-index:999;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;padding:30px;color:#fff;
+  }
+  .bloqueo-overlay h2{font-size:1.4rem;margin-bottom:10px;}
+  .bloqueo-overlay p{font-size:1rem;color:#c9d0e8;line-height:1.5;max-width:320px;}
+
+  .login-overlay{
+    position:fixed;inset:0;background:linear-gradient(160deg, var(--bg1), var(--bg2));z-index:1000;
+    display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:24px;
+    overflow-y:auto;
+  }
+  .login-box{
+    background:#fff;border-radius:20px;padding:24px 22px;width:100%;max-width:340px;
+    margin:auto 0;
+    box-shadow:0 10px 30px rgba(0,0,0,0.3);
+  }
+  .login-box h2{margin:0 0 6px;color:var(--text);font-size:1.3rem;text-align:center;}
+  .login-box p{margin:0 0 16px;color:#6b7690;font-size:0.88rem;text-align:center;}
+  .login-box input{
+    width:100%;padding:12px 14px;border-radius:12px;border:2px solid #e1e6f5;
+    background:#f5f7ff;color:var(--text);font-size:1rem;margin-bottom:10px;
+  }
+  .login-box button{
+    width:100%;padding:13px;border:none;border-radius:12px;
+    background:linear-gradient(135deg, var(--accent), #ff8e53);color:#fff;
+    font-weight:bold;font-size:1rem;cursor:pointer;margin-top:4px;
+  }
+  .login-error{color:#e0455a;font-size:0.85rem;text-align:center;margin-top:8px;min-height:18px;}
+  .admin-fila{
+    display:flex;flex-direction:column;gap:8px;
+    padding:10px 0;border-bottom:1px solid #eef1fb;
+  }
+  .admin-fila .info .correo{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .admin-fila .info .dias{font-size:0.78rem;color:#6b7690;}
+  .admin-fila .botones{display:flex;gap:8px;}
+  .admin-fila button{
+    border:none;border-radius:8px;padding:8px 10px;font-size:0.8rem;cursor:pointer;
+    width:auto;flex:1;margin-top:0;
+  }
+  .admin-fila .btn-editar{background:#eef1fb;color:var(--text);}
+  .admin-fila .btn-renovar{background:#d7f5e9;color:#1a7a4c;}
+  .admin-fila .btn-eliminar{background:#ffe0e0;color:#a33;}
+  .admin-fila .btn-restaurar{background:#e0f5e6;color:#1e7a3a;}
+  .admin-fila .btn-eliminar-def{background:#ffe0e0;color:#a33;}
+</style>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>👋 Peya Face</h1>
+    <p>¡Hablále y va a hacerte caso!</p>
+  </header>
+
+  <div class="stage-wrap">
+    <img id="idle-img" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0MDAgNDAwIj4KICA8ZGVmcz4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0iYmciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj4KICAgICAgPHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iI2RiZTRmZiIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiNjM2NlZjciLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgPC9kZWZzPgogIDxyZWN0IHdpZHRoPSI0MDAiIGhlaWdodD0iNDAwIiBmaWxsPSJ1cmwoI2JnKSIvPgogIDxjaXJjbGUgY3g9IjIwMCIgY3k9IjE2MCIgcj0iNzAiIGZpbGw9IiM5YWE1YzkiLz4KICA8cGF0aCBkPSJNIDcwIDM4MCBRIDcwIDI2MCAyMDAgMjYwIFEgMzMwIDI2MCAzMzAgMzgwIFoiIGZpbGw9IiM5YWE1YzkiLz4KPC9zdmc+" alt="Compañero">
+    <video id="action-video" playsinline muted></video>
+  </div>
+
+  <div class="panel" id="controls">
+    <div class="mic-row">
+      <button id="lang-btn" title="Idioma / Language">ES</button>
+      <button id="mic-btn">🎙️</button>
+      <div id="mic-status">Tocá el micrófono y decíle una orden</div>
+    </div>
+    <div class="chips">
+      <button class="chip" data-cmd="izquierda">⬅️ izquierda</button>
+      <button class="chip" data-cmd="derecha">➡️ derecha</button>
+      <button class="chip" data-cmd="sonrie">😊 sonríe</button>
+    </div>
+  </div>
+
+  <div class="plan-box" id="plan-box">
+    <div class="dias-restantes" id="dias-restantes-txt">Cargando...</div>
+    <button id="cambiar-usuario-btn" style="background:none;border:none;color:#fff;font-size:0.7rem;text-decoration:underline;cursor:pointer;padding:2px 0 0;margin-left:6px;">🔄 Cambiar usuario</button>
+  </div>
+</div>
+
+<div class="bloqueo-overlay" id="bloqueo-overlay" style="display:none;">
+  <h2>⏰ Servicio vencido</h2>
+  <p>Tu suscripción a Peya Face venció. Escribile a quien te lo armó para renovar y seguir usándolo.</p>
+</div>
+
+<div class="login-overlay" id="login-overlay">
+  <div class="login-box">
+    <h2>👋 Peya Face</h2>
+    <p>Ingresá con tu usuario y clave</p>
+    <input type="email" id="login-email" placeholder="Correo" autocomplete="username">
+    <input type="password" id="login-clave" placeholder="Clave" autocomplete="current-password">
+    <button id="login-btn">Entrar</button>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<div class="login-overlay" id="admin-overlay" style="display:none;">
+  <div class="login-box" style="max-width:380px;">
+    <h2>🛠️ Panel de administrador</h2>
+    <p>Agregá, renová o eliminá clientes.</p>
+
+    <p style="font-weight:bold;margin-bottom:8px;">Clientes</p>
+    <div id="admin-lista" style="text-align:left;font-size:0.9rem;margin-bottom:14px;"></div>
+
+    <button id="admin-nuevo-btn" style="background:linear-gradient(135deg, var(--accent2), #2ea89a);color:#fff;margin-bottom:12px;">+ Nuevo cliente</button>
+
+    <div id="admin-form" style="display:none;">
+      <input type="email" id="admin-email" placeholder="Correo del cliente" autocomplete="off">
+      <input type="text" id="admin-clave" placeholder="Clave del cliente" autocomplete="off">
+      <input type="date" id="admin-vence" style="width:100%;padding:12px 14px;border-radius:12px;border:2px solid #e1e6f5;background:#f5f7ff;color:var(--text);font-size:1rem;margin-bottom:10px;">
+
+      <p style="font-size:0.78rem;color:#6b7690;margin:10px 0 4px;">Videos del cliente (opcional, dejalos vacíos para no cambiarlos)</p>
+      <label style="display:block;font-size:0.78rem;text-align:left;margin-bottom:2px;">Selfie</label>
+      <input type="file" id="admin-video-selfie" accept="image/*" style="margin-bottom:8px;">
+      <label style="display:block;font-size:0.78rem;text-align:left;margin-bottom:2px;">Gira a la derecha</label>
+      <input type="file" id="admin-video-derecha" accept="video/*" style="margin-bottom:8px;">
+      <label style="display:block;font-size:0.78rem;text-align:left;margin-bottom:2px;">Gira a la izquierda</label>
+      <input type="file" id="admin-video-izquierda" accept="video/*" style="margin-bottom:8px;">
+      <label style="display:block;font-size:0.78rem;text-align:left;margin-bottom:2px;">Sonrisa</label>
+      <input type="file" id="admin-video-sonrie" accept="video/*" style="margin-bottom:10px;">
+
+      <button id="admin-guardar-btn">Guardar cliente</button>
+      <div id="admin-subiendo" style="font-size:0.82rem;color:#6b7690;margin-top:6px;"></div>
+      <div class="login-error" id="admin-error"></div>
+    </div>
+
+    <button id="admin-cerrar-btn" style="background:#eef1fb;color:var(--text);margin-top:14px;">Cerrar sesión</button>
+  </div>
+</div>
+
+
+<script>
+const idleImg = document.getElementById('idle-img');
+const actionVideo = document.getElementById('action-video');
+const micBtn = document.getElementById('mic-btn');
+const micStatus = document.getElementById('mic-status');
+let recognition = null;
+let listening = false;
+let playing = false;
+
+const CLIPS = {
+  izquierda: null,
+  derecha: null,
+  sonrie: null
+};
+
+const TARGET_DURATION = 3; // segundos que debe durar cada acción
+
+let finSegmentoActual = null;
+
+function terminarClip(){
+  actionVideo.style.opacity = 0;
+  idleImg.style.opacity = 1;
+  setTimeout(()=>{ actionVideo.pause(); }, 250);
+  playing = false;
+  finSegmentoActual = null;
+}
+
+function playClip(cmd){
+  if(playing) return;
+  const clip = CLIPS_ACTIVAS[cmd];
+  if(!clip || !clip.src) return;
+  playing = true;
+  actionVideo.src = clip.src;
+  actionVideo.playbackRate = 1;
+  actionVideo.onerror = () => {
+    const codigo = actionVideo.error ? actionVideo.error.code : '?';
+    micStatus.textContent = 'No se pudo cargar el video de "' + cmd + '" (error ' + codigo + ')';
+    micStatus.style.display = 'block';
+    playing = false;
+    actionVideo.onerror = null;
+  };
+  const avisoDemora = setTimeout(() => {
+    if(playing){
+      micStatus.textContent = 'El video de "' + cmd + '" está tardando demasiado en cargar.';
+      micStatus.style.display = 'block';
+      playing = false;
+    }
+  }, 8000);
+  actionVideo.onloadedmetadata = () => {
+    clearTimeout(avisoDemora);
+    const inicio = clip.inicio || 0;
+    const fin = (clip.fin !== null && clip.fin !== undefined) ? clip.fin : actionVideo.duration;
+    const duracionSegmento = fin - inicio;
+    if(duracionSegmento > 0 && isFinite(duracionSegmento)){
+      actionVideo.playbackRate = duracionSegmento / TARGET_DURATION;
+    }
+    finSegmentoActual = fin;
+    actionVideo.currentTime = inicio;
+    actionVideo.onseeked = () => {
+      actionVideo.onseeked = null;
+      actionVideo.play().catch(()=>{});
+      actionVideo.ontimeupdate = () => {
+        actionVideo.ontimeupdate = null;
+        idleImg.style.opacity = 0;
+        actionVideo.style.opacity = 1;
+      };
+    };
+  };
+}
+
+actionVideo.addEventListener('ended', terminarClip);
+actionVideo.addEventListener('timeupdate', ()=>{
+  if(finSegmentoActual !== null && actionVideo.currentTime >= finSegmentoActual - 0.05){
+    terminarClip();
+  }
+});
+
+document.querySelectorAll('.chip').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    playClip(btn.dataset.cmd);
+  });
+});
+
+let debeEscuchar = false;
+
+// Idioma de escucha: 'es' o 'en' (se recuerda en el celular)
+let idioma = 'es';
+try{ if(localStorage.getItem('peya_idioma') === 'en') idioma = 'en'; }catch(e){}
+const langBtn = document.getElementById('lang-btn');
+const BANDERA_ES = '<svg width="30" height="20" viewBox="0 0 90 60" aria-hidden="true" style="border-radius:3px;display:block"><rect width="90" height="60" fill="#fff"/><rect y="6.7" width="90" height="6.7" fill="#1352C0"/><rect y="20.0" width="90" height="6.7" fill="#1352C0"/><rect y="33.3" width="90" height="6.7" fill="#1352C0"/><rect y="46.7" width="90" height="6.7" fill="#1352C0"/><rect width="26.7" height="26.7" fill="#fff"/><g stroke="#F4B400" stroke-width="2.2" stroke-linecap="round"><line x1="17.9" y1="13.3" x2="24.3" y2="13.3"/><line x1="17.6" y1="15.1" x2="21.5" y2="16.7"/><line x1="16.6" y1="16.6" x2="21.1" y2="21.1"/><line x1="15.1" y1="17.6" x2="16.7" y2="21.5"/><line x1="13.3" y1="17.9" x2="13.3" y2="24.3"/><line x1="11.6" y1="17.6" x2="10.0" y2="21.5"/><line x1="10.1" y1="16.6" x2="5.6" y2="21.1"/><line x1="9.1" y1="15.1" x2="5.2" y2="16.7"/><line x1="8.7" y1="13.3" x2="2.3" y2="13.3"/><line x1="9.1" y1="11.6" x2="5.2" y2="10.0"/><line x1="10.1" y1="10.1" x2="5.6" y2="5.6"/><line x1="11.6" y1="9.1" x2="10.0" y2="5.2"/><line x1="13.3" y1="8.7" x2="13.3" y2="2.3"/><line x1="15.1" y1="9.1" x2="16.7" y2="5.2"/><line x1="16.6" y1="10.1" x2="21.1" y2="5.6"/><line x1="17.6" y1="11.6" x2="21.5" y2="10.0"/></g><circle cx="13.3" cy="13.3" r="4.4" fill="#F4B400"/></svg>';
+const BANDERA_EN = '<svg width="38" height="20" viewBox="0 0 114 60" aria-hidden="true" style="border-radius:3px;display:block"><rect width="114" height="60" fill="#B22234"/><rect y="4.6" width="114" height="4.6" fill="#fff"/><rect y="13.8" width="114" height="4.6" fill="#fff"/><rect y="23.1" width="114" height="4.6" fill="#fff"/><rect y="32.3" width="114" height="4.6" fill="#fff"/><rect y="41.5" width="114" height="4.6" fill="#fff"/><rect y="50.8" width="114" height="4.6" fill="#fff"/><rect width="45.6" height="32.3" fill="#3C3B6E"/><circle cx="3.8" cy="3.2" r="1.5" fill="#fff"/><circle cx="11.4" cy="3.2" r="1.5" fill="#fff"/><circle cx="19.0" cy="3.2" r="1.5" fill="#fff"/><circle cx="26.6" cy="3.2" r="1.5" fill="#fff"/><circle cx="34.2" cy="3.2" r="1.5" fill="#fff"/><circle cx="41.8" cy="3.2" r="1.5" fill="#fff"/><circle cx="7.6" cy="6.4" r="1.5" fill="#fff"/><circle cx="15.2" cy="6.4" r="1.5" fill="#fff"/><circle cx="22.8" cy="6.4" r="1.5" fill="#fff"/><circle cx="30.4" cy="6.4" r="1.5" fill="#fff"/><circle cx="38.0" cy="6.4" r="1.5" fill="#fff"/><circle cx="3.8" cy="9.7" r="1.5" fill="#fff"/><circle cx="11.4" cy="9.7" r="1.5" fill="#fff"/><circle cx="19.0" cy="9.7" r="1.5" fill="#fff"/><circle cx="26.6" cy="9.7" r="1.5" fill="#fff"/><circle cx="34.2" cy="9.7" r="1.5" fill="#fff"/><circle cx="41.8" cy="9.7" r="1.5" fill="#fff"/><circle cx="7.6" cy="12.9" r="1.5" fill="#fff"/><circle cx="15.2" cy="12.9" r="1.5" fill="#fff"/><circle cx="22.8" cy="12.9" r="1.5" fill="#fff"/><circle cx="30.4" cy="12.9" r="1.5" fill="#fff"/><circle cx="38.0" cy="12.9" r="1.5" fill="#fff"/><circle cx="3.8" cy="16.2" r="1.5" fill="#fff"/><circle cx="11.4" cy="16.2" r="1.5" fill="#fff"/><circle cx="19.0" cy="16.2" r="1.5" fill="#fff"/><circle cx="26.6" cy="16.2" r="1.5" fill="#fff"/><circle cx="34.2" cy="16.2" r="1.5" fill="#fff"/><circle cx="41.8" cy="16.2" r="1.5" fill="#fff"/><circle cx="7.6" cy="19.4" r="1.5" fill="#fff"/><circle cx="15.2" cy="19.4" r="1.5" fill="#fff"/><circle cx="22.8" cy="19.4" r="1.5" fill="#fff"/><circle cx="30.4" cy="19.4" r="1.5" fill="#fff"/><circle cx="38.0" cy="19.4" r="1.5" fill="#fff"/><circle cx="3.8" cy="22.6" r="1.5" fill="#fff"/><circle cx="11.4" cy="22.6" r="1.5" fill="#fff"/><circle cx="19.0" cy="22.6" r="1.5" fill="#fff"/><circle cx="26.6" cy="22.6" r="1.5" fill="#fff"/><circle cx="34.2" cy="22.6" r="1.5" fill="#fff"/><circle cx="41.8" cy="22.6" r="1.5" fill="#fff"/><circle cx="7.6" cy="25.9" r="1.5" fill="#fff"/><circle cx="15.2" cy="25.9" r="1.5" fill="#fff"/><circle cx="22.8" cy="25.9" r="1.5" fill="#fff"/><circle cx="30.4" cy="25.9" r="1.5" fill="#fff"/><circle cx="38.0" cy="25.9" r="1.5" fill="#fff"/><circle cx="3.8" cy="29.1" r="1.5" fill="#fff"/><circle cx="11.4" cy="29.1" r="1.5" fill="#fff"/><circle cx="19.0" cy="29.1" r="1.5" fill="#fff"/><circle cx="26.6" cy="29.1" r="1.5" fill="#fff"/><circle cx="34.2" cy="29.1" r="1.5" fill="#fff"/><circle cx="41.8" cy="29.1" r="1.5" fill="#fff"/></svg>';
+function pintarIdioma(){
+  const en = (idioma === 'en');
+  langBtn.innerHTML = (en ? BANDERA_EN : BANDERA_ES) + '<span>' + (en ? 'EN' : 'ES') + '</span>';
+  langBtn.setAttribute('aria-label', en ? 'Language: English. Tap to change to Spanish' : 'Idioma: Español. Tocá para cambiar a inglés');
+}
+pintarIdioma();
+langBtn.addEventListener('click', ()=>{
+  idioma = (idioma === 'es') ? 'en' : 'es';
+  try{ localStorage.setItem('peya_idioma', idioma); }catch(e){}
+  pintarIdioma();
+  if(usarVosk){ cambiarIdiomaVosk(); return; }
+  if(recognition){
+    recognition.lang = (idioma === 'en') ? 'en-US' : 'es-ES';
+    // Si está escuchando, lo reiniciamos para que tome el idioma nuevo
+    if(debeEscuchar){ try{ recognition.stop(); }catch(e){} }
+  }
+});
+
+const inicios = [];   // momentos en que arrancó la escucha (para no reiniciar sin parar)
+
+// Cartelito para avisar problemas del micrófono
+let avisoEl = null, avisoTimer = null;
+function avisar(texto, ms){
+  if(!avisoEl){
+    avisoEl = document.createElement('div');
+    avisoEl.style.cssText = 'position:fixed;left:50%;bottom:120px;transform:translateX(-50%);max-width:82%;' +
+      'background:rgba(0,0,0,0.85);color:#fff;padding:10px 16px;border-radius:14px;font-size:0.9rem;' +
+      'text-align:center;z-index:60;box-shadow:0 4px 14px rgba(0,0,0,0.35);';
+    document.body.appendChild(avisoEl);
+  }
+  avisoEl.textContent = texto;
+  avisoEl.style.display = 'block';
+  clearTimeout(avisoTimer);
+  avisoTimer = setTimeout(()=>{ avisoEl.style.display = 'none'; }, ms || 5000);
+}
+
+function iniciarEscucha(){
+  if(!recognition || micBtn.disabled || debeEscuchar) return;
+  debeEscuchar = true;
+  try{ recognition.start(); }catch(e){}
+}
+
+// Al entrar el cliente: prende el micrófono solo. Si el celular exige un toque, el primero en la pantalla lo activa.
+async function activarMicAlEntrar(conToque){
+  if(usarVosk){ iniciarVosk(); return; }
+  if(conToque) iniciarEscucha();   // venimos de tocar "Entrar": el celular deja prender el micrófono
+  let permitido = false;
+  try{
+    const permiso = await navigator.permissions.query({ name: 'microphone' });
+    permitido = (permiso.state === 'granted');
+  }catch(e){}
+  if(permitido && !debeEscuchar) iniciarEscucha();
+  const primerToque = (ev)=>{
+    document.removeEventListener('pointerdown', primerToque, true);
+    if(ev.target && ev.target.closest && ev.target.closest('#mic-btn')) return; // el botón ya lo maneja
+    iniciarEscucha();
+  };
+  document.addEventListener('pointerdown', primerToque, true);
+}
+
+// Si el cliente cambia de app y vuelve, el micrófono se retoma solo
+document.addEventListener('visibilitychange', ()=>{
+  if(usarVosk && vosk.stream){
+    vosk.stream.getAudioTracks().forEach(t=>{ t.enabled = (!document.hidden && vosk.activo); });
+    return;
+  }
+  if(!recognition || !debeEscuchar) return;
+  if(document.hidden){
+    try{ recognition.stop(); }catch(e){}
+  } else if(!listening){
+    try{ recognition.start(); }catch(e){}
+  }
+});
+
+
+// ---------- VOZ SIN RUIDO: la voz se reconoce dentro del celular ----------
+// Es el modo normal. No usa el servicio de voz de Google, así que no hace el "ding" al prender y apagar.
+// Descarga un modelo de voz (~40 MB) la primera vez. Si algo falla, vuelve solo a la voz de Google.
+// Para probar la voz de Google a propósito, abrir la app como  peyaface.com/#normal
+let usarVosk = (location.hash !== '#normal');
+const VOSK_JS = 'https://cdn.jsdelivr.net/npm/vosk-browser@0.0.8/dist/vosk.js';
+const VOSK_MODELOS = {
+  es: ['https://ccoreilly.github.io/vosk-browser/models/vosk-model-small-es-0.42.tar.gz',
+       'https://huggingface.co/Andesprit/vosk-small/resolve/main/vosk-model-small-es-0.42.tar.gz'],
+  en: ['https://ccoreilly.github.io/vosk-browser/models/vosk-model-small-en-us-0.15.tar.gz',
+       'https://huggingface.co/Andesprit/vosk-small/resolve/main/vosk-model-small-en-us-0.15.tar.gz']
+};
+const vosk = { ctx:null, stream:null, fuente:null, nodo:null, modelo:null, reconocedor:null, activo:false, cargando:false };
+
+// Modo "ver qué escucha": abrir la app como  .../mi-companero-video.html#debug
+// Muestra en pantalla lo que entiende la voz y un medidor de volumen del micrófono.
+const MODO_DEBUG = (location.hash === '#debug');
+let depEl = null, depNivel = 0;
+const depLineas = [];
+function depurar(tipo, texto){
+  if(!MODO_DEBUG) return;
+  if(!depEl){
+    depEl = document.createElement('div');
+    depEl.style.cssText = 'position:fixed;left:8px;top:96px;max-width:72%;background:rgba(0,0,0,0.78);color:#fff;' +
+      'font:13px/1.4 monospace;padding:8px 10px;border-radius:10px;z-index:70;pointer-events:none;white-space:pre-wrap;';
+    document.body.appendChild(depEl);
+  }
+  if(tipo){
+    const marca = (tipo === 'final') ? 'OK  ' : (tipo === 'info') ? 'i   ' : '... ';
+    depLineas.push(marca + texto);
+    while(depLineas.length > 6) depLineas.shift();
+  }
+  const barra = '#'.repeat(Math.min(24, Math.round(depNivel * 80)));
+  depEl.textContent = 'Mic: [' + barra + ']\n' + depLineas.join('\n');
+}
+
+function cargarScriptVosk(){
+  return new Promise((ok, mal)=>{
+    if(window.Vosk) return ok();
+    const sc = document.createElement('script');
+    sc.src = VOSK_JS;
+    sc.onload = ok;
+    sc.onerror = ()=> mal(new Error('No se pudo cargar la librería de voz'));
+    document.head.appendChild(sc);
+  });
+}
+
+async function cargarModeloVosk(lang){
+  let ultimoError = new Error('Sin modelo');
+  for(const url of VOSK_MODELOS[lang]){
+    try{
+      return await Promise.race([
+        Vosk.createModel(url),
+        new Promise((_, mal)=> setTimeout(()=> mal(new Error('Tardó demasiado')), 180000))
+      ]);
+    }catch(e){ ultimoError = e; }
+  }
+  throw ultimoError;
+}
+
+function armarReconocedorVosk(){
+  if(vosk.reconocedor){ try{ vosk.reconocedor.remove(); }catch(e){} }
+  const r = new vosk.modelo.KaldiRecognizer();
+  r.on('result', (m)=>{ const t = m && m.result && m.result.text; if(t){ depurar('final', t); } if(t && vosk.activo) handleSpokenText(t); });
+  r.on('partialresult', (m)=>{ const t = m && m.result && m.result.partial; if(t){ depurar('parcial', t); } if(t && vosk.activo) handleSpokenText(t); });
+  vosk.reconocedor = r;
+}
+
+async function iniciarVosk(){
+  if(vosk.cargando || vosk.ctx) return;
+  vosk.cargando = true;
+  avisar(idioma === 'en' ? 'Loading quiet voice… (first time ~40 MB)' : 'Cargando la voz sin ruido… (la primera vez baja unos 40 MB)', 120000);
+  try{
+    depurar('info', 'cargando modelo (' + idioma + ')...');
+    await cargarScriptVosk();
+    vosk.modelo = await cargarModeloVosk(idioma);
+    depurar('info', 'modelo listo');
+    armarReconocedorVosk();
+    vosk.stream = await navigator.mediaDevices.getUserMedia({
+      video: false,
+      audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 }
+    });
+    const AC = window.AudioContext || window.webkitAudioContext;
+    vosk.ctx = new AC();
+    vosk.fuente = vosk.ctx.createMediaStreamSource(vosk.stream);
+    vosk.nodo = vosk.ctx.createScriptProcessor(4096, 1, 1);
+    vosk.nodo.onaudioprocess = (ev)=>{
+      if(MODO_DEBUG){
+        const dat = ev.inputBuffer.getChannelData(0);
+        let suma = 0; for(let i = 0; i < dat.length; i++){ suma += dat[i] * dat[i]; }
+        depNivel = Math.sqrt(suma / dat.length);
+        depurar();
+      }
+      if(!vosk.activo || !vosk.reconocedor) return;
+      try{ vosk.reconocedor.acceptWaveform(ev.inputBuffer); }catch(e){}
+    };
+    vosk.fuente.connect(vosk.nodo);
+    vosk.nodo.connect(vosk.ctx.destination);
+    try{ if(vosk.ctx.state === 'suspended') await vosk.ctx.resume(); }catch(e){}
+    vosk.activo = true;
+    debeEscuchar = true;
+    listening = true;
+    updateMicUI();
+    depurar('info', 'escuchando');
+    avisar(idioma === 'en' ? 'Listening, no beeps.' : 'Listo: escuchando sin ruido.', 3500);
+  }catch(e){
+    console.warn('Voz sin ruido falló:', e);
+    depurar('info', 'ERROR: ' + (e && e.message ? e.message : e));
+    usarVosk = false;
+    vosk.activo = false;
+    if(vosk.stream){ try{ vosk.stream.getTracks().forEach(t=>t.stop()); }catch(_){} }
+    avisar('No se pudo usar la voz sin ruido. Uso la voz normal.', 6000);
+    iniciarEscucha();
+  }finally{
+    vosk.cargando = false;
+  }
+}
+
+function alternarVosk(){
+  if(!vosk.ctx){ iniciarVosk(); return; }
+  vosk.activo = !vosk.activo;
+  debeEscuchar = vosk.activo;
+  listening = vosk.activo;
+  if(vosk.stream){ vosk.stream.getAudioTracks().forEach(t=>{ t.enabled = vosk.activo; }); }
+  updateMicUI();
+}
+
+async function cambiarIdiomaVosk(){
+  if(!vosk.modelo) return;   // todavía cargando: se usa el idioma elegido al terminar
+  avisar(idioma === 'en' ? 'Changing language…' : 'Cambiando de idioma…', 60000);
+  try{
+    const nuevo = await cargarModeloVosk(idioma);
+    const viejo = vosk.modelo;
+    vosk.modelo = nuevo;
+    armarReconocedorVosk();
+    try{ viejo.terminate(); }catch(e){}
+    avisar(idioma === 'en' ? 'Language changed.' : 'Idioma cambiado.', 2500);
+  }catch(e){
+    avisar('No pude cambiar el idioma.', 5000);
+  }
+}
+
+// Si el celular dejó el audio en pausa, el primer toque lo reanuda
+document.addEventListener('pointerdown', ()=>{
+  if(vosk.ctx && vosk.ctx.state === 'suspended'){ try{ vosk.ctx.resume(); }catch(e){} }
+}, true);
+
+function setupRecognition(){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR){
+    micStatus.textContent = 'El micrófono automático no anda en este navegador.';
+    micBtn.disabled = true;
+    micBtn.style.opacity = 0.4;
+    return;
+  }
+  try{
+    recognition = new SR();
+    recognition.lang = (idioma === 'en') ? 'en-US' : 'es-ES';
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.onresult = (e)=>{
+      const ultimo = e.results[e.results.length - 1];
+      const text = ultimo[0].transcript.toLowerCase();
+      handleSpokenText(text);
+    };
+    recognition.onstart = ()=>{
+      // Recién acá está de verdad escuchando: el botón se pone verde
+      listening = true;
+      inicios.push(Date.now());
+      updateMicUI();
+    };
+    recognition.onerror = (e)=>{
+      const err = e && e.error;
+      if(err === 'not-allowed' || err === 'service-not-allowed'){
+        // El celular no deja usar el micrófono: no insistimos y avisamos qué hacer
+        debeEscuchar = false;
+        listening = false;
+        updateMicUI();
+        avisar('El micrófono está bloqueado. Tocá el candado de arriba → Permisos → Micrófono → Permitir.', 9000);
+      } else if(err === 'audio-capture'){
+        debeEscuchar = false;
+        listening = false;
+        updateMicUI();
+        avisar('No encuentro el micrófono del celular.', 6000);
+      } else if(err === 'network'){
+        avisar('Sin internet: el reconocimiento de voz necesita conexión.', 4000);
+      }
+      // "no-speech" y "aborted" son normales (nadie habló): se reintenta solo
+    };
+    recognition.onend = ()=>{
+      listening = false;
+      updateMicUI();
+      if(debeEscuchar && !micBtn.disabled && !document.hidden){
+        // Si se reinicia demasiadas veces seguidas, esperamos un poco para no hacer ruido de más
+        const ahora = Date.now();
+        while(inicios.length && ahora - inicios[0] > 10000) inicios.shift();
+        const espera = inicios.length >= 6 ? 4000 : 300;
+        setTimeout(()=>{
+          if(debeEscuchar && !document.hidden){
+            try{ recognition.start(); }catch(e){}
+          }
+        }, espera);
+      }
+    };
+  }catch(err){
+    micStatus.textContent = 'El micrófono no está disponible en este navegador.';
+    micBtn.disabled = true;
+    micBtn.style.opacity = 0.4;
+  }
+}
+
+// Reinicio preventivo: a veces el reconocimiento de voz se "cuelga" en silencio
+// sin avisar. Cada 60 segundos, si debería estar escuchando, lo reiniciamos igual.
+setInterval(()=>{
+  if(debeEscuchar && recognition && !micBtn.disabled){
+    try{ recognition.stop(); }catch(e){}
+  }
+}, 60000);
+
+function updateMicUI(){
+  micBtn.classList.toggle('listening', listening);
+  micStatus.textContent = listening ? '🎧 Escuchando...' : 'Tocá el micrófono para activarlo';
+}
+
+micBtn.addEventListener('click', ()=>{
+  if(usarVosk){ alternarVosk(); return; }
+  if(!recognition) return;
+  if(!debeEscuchar){
+    debeEscuchar = true;
+    try{ recognition.start(); }catch(e){}
+  } else {
+    debeEscuchar = false;
+    recognition.stop();
+  }
+});
+
+// Distancia entre dos palabras: cuántas letras hay que cambiar para pasar de una a otra
+function distanciaTexto(a, b){
+  const m = a.length, n = b.length;
+  const d = [];
+  for(let i = 0; i <= m; i++){ d[i] = [i]; }
+  for(let j = 1; j <= n; j++){ d[0][j] = j; }
+  for(let i = 1; i <= m; i++){
+    for(let j = 1; j <= n; j++){
+      d[i][j] = Math.min(d[i-1][j] + 1, d[i][j-1] + 1, d[i-1][j-1] + (a[i-1] === b[j-1] ? 0 : 1));
+    }
+  }
+  return d[m][n];
+}
+
+function handleSpokenText(text){
+  // Sin acentos ni mayúsculas, así "sonríe" y "sonrie" son lo mismo
+  text = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  // Incluye cómo suenan estas palabras con distintos acentos (ej. "right" dicho como "light")
+  const rules = [
+    {cmd:'izquierda', words:['izquierd','left','lift','loft']},
+    {cmd:'derecha', words:['derech','right','write','rite','light','lite','ride']},
+    {cmd:'sonrie', words:['sonri','sonrei','smile','smiling','smell','small','mile']}
+  ];
+  const match = rules.find(r => r.words.some(w => text.includes(w)));
+  if(match){
+    playClip(match.cmd);
+    return;
+  }
+  // Si no coincide exacto, probamos con palabras parecidas (1 letra de diferencia) en inglés
+  const claves = [
+    {cmd:'derecha', palabra:'right'},
+    {cmd:'izquierda', palabra:'left'},
+    {cmd:'sonrie', palabra:'smile'}
+  ];
+  let mejor = null, mejorDist = 2;
+  text.split(/[^a-z]+/).forEach(tok=>{
+    if(tok.length < 4) return;
+    claves.forEach(c=>{
+      const dist = distanciaTexto(tok, c.palabra);
+      if(dist < mejorDist){ mejorDist = dist; mejor = c.cmd; }
+    });
+  });
+  if(mejor) playClip(mejor);
+}
+
+setupRecognition();
+
+// ---------- Control de vencimiento del plan ----------
+function pad2(n){ return n < 10 ? '0'+n : ''+n; }
+
+function fechaAISO(d){
+  return d.getFullYear() + '-' + pad2(d.getMonth()+1) + '-' + pad2(d.getDate());
+}
+
+// ---------- Tabla de clientes: correo, clave y fecha de vencimiento ----------
+// Estos son solo de ejemplo/respaldo. Los clientes reales se administran desde el Panel de administrador.
+const CLIENTES = {
+  'ejemplo@gmail.com': { clave: '1234', vence: '2026-12-31' }
+};
+
+const ADMIN_EMAIL = 'admin@peyaface.com';
+const ADMIN_CLAVE = 'admin2026';
+
+function bloquearApp(mensajeExtra){
+  const overlay = document.getElementById('bloqueo-overlay');
+  if(mensajeExtra){
+    overlay.querySelector('p').textContent = mensajeExtra;
+  }
+  overlay.style.display = 'flex';
+  micBtn.disabled = true;
+  document.querySelectorAll('.chip').forEach(b => b.disabled = true);
+}
+
+const cambiarUsuarioBtn = document.getElementById('cambiar-usuario-btn');
+cambiarUsuarioBtn.addEventListener('click', ()=>{
+  localStorage.removeItem('peya_email');
+  location.reload();
+});
+
+async function chequearPlan(email){
+  const cliente = await obtenerCliente(email);
+  const txtDias = document.getElementById('dias-restantes-txt');
+
+  if(!cliente){
+    txtDias.textContent = 'Sin suscripción activa';
+    bloquearApp('No encontramos tu suscripción. Escribile a quien te armó la app.');
+    return;
+  }
+
+  const hoy = new Date();
+  hoy.setHours(0,0,0,0);
+  const partes = cliente.vence.split('-').map(Number);
+  const vence = new Date(partes[0], partes[1]-1, partes[2]);
+  vence.setHours(0,0,0,0);
+
+  const msPorDia = 1000*60*60*24;
+  const diasRestantes = Math.round((vence - hoy) / msPorDia);
+
+  if(diasRestantes < 0){
+    txtDias.textContent = 'Suscripción vencida';
+    bloquearApp();
+    return;
+  }
+
+  txtDias.textContent = diasRestantes === 0
+    ? 'Último día de servicio'
+    : 'Restan ' + diasRestantes + ' día' + (diasRestantes === 1 ? '' : 's');
+}
+
+// ---------- Clientes: guardados en Firebase, compartidos entre todos los celulares ----------
+const firebaseConfig = {
+  apiKey: "AIzaSyAAx56obdDz_ctzfjoI804wu1cA_OmrewA",
+  authDomain: "peyaface.firebaseapp.com",
+  projectId: "peyaface",
+  storageBucket: "peyaface.firebasestorage.app",
+  messagingSenderId: "697972891928",
+  appId: "1:697972891928:web:fabe67ccd3cb31195c7e6d",
+  measurementId: "G-6K06TEYJ6X"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const storage = firebase.storage();
+
+// ---------- Guardado del video propio de cada cliente (en este celular) ----------
+const DB_NAME = 'peyaFaceDB';
+const STORE_NAME = 'media';
+let CLIPS_ACTIVAS = {
+  izquierda: { src: CLIPS.izquierda, inicio: 0, fin: null },
+  derecha: { src: CLIPS.derecha, inicio: 0, fin: null },
+  sonrie: { src: CLIPS.sonrie, inicio: 0, fin: null }
+};
+const IDLE_DEFAULT = idleImg.src;
+
+async function aplicarMediaPersonalizada(email){
+  const mediaLocal = await leerMedia(email) || {};
+  let mediaNube = {};
+  try{
+    const cliente = await obtenerCliente(email);
+    mediaNube = (cliente && cliente.media) || {};
+  }catch(e){}
+
+  // Prioridad: lo que subió el admin a la nube, y si no hay, lo que subió el cliente en este celular
+  const media = {
+    idle: mediaNube.idle || mediaLocal.idle,
+    izquierda: mediaNube.izquierda || (mediaLocal.izquierda && mediaLocal.izquierda.src),
+    derecha: mediaNube.derecha || (mediaLocal.derecha && mediaLocal.derecha.src),
+    sonrie: mediaNube.sonrie || (mediaLocal.sonrie && mediaLocal.sonrie.src)
+  };
+
+  CLIPS_ACTIVAS = {
+    izquierda: { src: media.izquierda || null, inicio: 0, fin: null },
+    derecha: { src: media.derecha || null, inicio: 0, fin: null },
+    sonrie: { src: media.sonrie || null, inicio: 0, fin: null }
+  };
+  idleImg.src = media.idle || IDLE_DEFAULT;
+  return media;
+}
+
+function abrirDB(){
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, 2);
+    req.onupgradeneeded = (e) => {
+      const dbLocal = e.target.result;
+      if(!dbLocal.objectStoreNames.contains(STORE_NAME)) dbLocal.createObjectStore(STORE_NAME);
+    };
+    req.onsuccess = (e) => resolve(e.target.result);
+    req.onerror = (e) => reject(e);
+  });
+}
+
+async function guardarCliente(email, clave, vence){
+  await db.collection('clientes').doc(email).set({ clave, vence, borrado: false }, { merge: true });
+}
+
+async function borrarCliente(email){
+  await db.collection('clientes').doc(email).set({ borrado: true, borradoEn: new Date().toISOString() }, { merge: true });
+}
+async function restaurarCliente(email){
+  await db.collection('clientes').doc(email).set({ borrado: false }, { merge: true });
+}
+async function eliminarDefinitivo(email){
+  await db.collection('clientes').doc(email).delete();
+}
+
+async function listarClientes(){
+  try{
+    const snapshot = await db.collection('clientes').get();
+    const resultado = [];
+    snapshot.forEach(doc => {
+      resultado.push({ email: doc.id, clave: doc.data().clave, vence: doc.data().vence, borrado: !!doc.data().borrado });
+    });
+    return resultado;
+  }catch(e){ return []; }
+}
+
+async function obtenerCliente(email){
+  try{
+    const doc = await db.collection('clientes').doc(email).get();
+    if(doc.exists){ if(doc.data().borrado) return null; return doc.data(); }
+  }catch(e){}
+  return CLIENTES[email] || null;
+}
+
+async function guardarMedia(email, datos){
+  const db = await abrirDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    tx.objectStore(STORE_NAME).put(datos, 'media_' + email);
+    tx.oncomplete = () => resolve();
+    tx.onerror = (e) => reject(e);
+  });
+}
+
+async function leerMedia(email){
+  try{
+    const db = await abrirDB();
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const req = tx.objectStore(STORE_NAME).get('media_' + email);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => resolve(null);
+    });
+  }catch(e){ return null; }
+}
+// ---------- Login ----------
+const loginOverlay = document.getElementById('login-overlay');
+const loginEmail = document.getElementById('login-email');
+const loginClave = document.getElementById('login-clave');
+const loginBtn = document.getElementById('login-btn');
+const loginError = document.getElementById('login-error');
+
+const adminOverlay = document.getElementById('admin-overlay');
+const adminForm = document.getElementById('admin-form');
+const adminNuevoBtn = document.getElementById('admin-nuevo-btn');
+const adminEmailInput = document.getElementById('admin-email');
+const adminClaveInput = document.getElementById('admin-clave');
+const adminVenceInput = document.getElementById('admin-vence');
+const adminGuardarBtn = document.getElementById('admin-guardar-btn');
+const adminError = document.getElementById('admin-error');
+const adminLista = document.getElementById('admin-lista');
+const adminCerrarBtn = document.getElementById('admin-cerrar-btn');
+const adminVideoSelfie = document.getElementById('admin-video-selfie');
+const adminVideoDerecha = document.getElementById('admin-video-derecha');
+const adminVideoIzquierda = document.getElementById('admin-video-izquierda');
+const adminVideoSonrie = document.getElementById('admin-video-sonrie');
+const adminSubiendo = document.getElementById('admin-subiendo');
+
+function subirUnArchivo(ref, archivo, clave){
+  return new Promise((resolve, reject) => {
+    const tarea = ref.put(archivo);
+    tarea.on('state_changed',
+      (snapshot) => {
+        const pct = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+        adminSubiendo.textContent = 'Subiendo ' + clave + '... ' + pct + '%';
+      },
+      (error) => reject(error),
+      () => resolve()
+    );
+  });
+}
+
+async function subirMediaCliente(email, archivos){
+  const resultado = {};
+  const entradas = Object.entries(archivos).filter(([k, v]) => v);
+  let i = 0;
+  for(const [clave, archivo] of entradas){
+    i++;
+    adminSubiendo.textContent = 'Subiendo archivo ' + i + ' de ' + entradas.length + ' (' + clave + ')...';
+    const ref = storage.ref().child('clientes/' + email + '/' + clave + '_' + Date.now());
+    await subirUnArchivo(ref, archivo, clave);
+    const url = await ref.getDownloadURL();
+    resultado[clave] = url;
+  }
+  adminSubiendo.textContent = '¡Listo, se subieron todos los archivos!';
+  return resultado;
+}
+
+adminNuevoBtn.addEventListener('click', ()=>{
+  adminEmailInput.value = '';
+  adminClaveInput.value = '';
+  adminVenceInput.value = '';
+  adminError.textContent = '';
+  adminForm.style.display = 'block';
+  adminEmailInput.focus();
+});
+
+async function renderizarAdmin(){
+  const todos = await listarClientes();
+  const clientes = todos.filter(c => !c.borrado);
+  const papelera = todos.filter(c => c.borrado);
+  adminLista.innerHTML = '';
+  if(clientes.length === 0 && papelera.length === 0){
+    adminLista.innerHTML = '<p style="font-size:0.85rem;color:#6b7690;">Todavía no agregaste ningún cliente.</p>';
+    return;
+  }
+  const hoy = new Date();
+  hoy.setHours(0,0,0,0);
+
+  clientes.sort((a, b) => a.vence.localeCompare(b.vence));
+
+  clientes.forEach(c => {
+    const partes = c.vence.split('-').map(Number);
+    const vence = new Date(partes[0], partes[1]-1, partes[2]);
+    const dias = Math.round((vence - hoy) / (1000*60*60*24));
+    const fila = document.createElement('div');
+    fila.className = 'admin-fila';
+    const vencido = dias <= 0;
+    const estado = dias < 0 ? 'Vencido' : (dias === 0 ? 'Último día' : ('Restan ' + dias + ' día' + (dias === 1 ? '' : 's')));
+    const colorEstado = vencido ? 'style="color:#c62828;font-weight:bold;"' : '';
+    const botones = vencido
+      ? '<button class="btn-renovar" data-email="' + c.email + '">Renovar</button>' +
+        '<button class="btn-eliminar" data-email="' + c.email + '">Cancelar</button>'
+      : '<button class="btn-editar" data-email="' + c.email + '">Editar</button>' +
+        '<button class="btn-eliminar" data-email="' + c.email + '">Borrar</button>';
+    fila.innerHTML =
+      '<div class="info"><div class="correo"' + (vencido ? ' style="color:#c62828;"' : '') + '>' + c.email + '</div>' +
+      '<div class="dias" ' + colorEstado + '>' + estado + ' · vence ' + c.vence + '</div></div>' +
+      '<div class="botones">' + botones + '</div>';
+    if(vencido) fila.style.background = '#fdeaea';
+    adminLista.appendChild(fila);
+  });
+
+  if(papelera.length > 0){
+    const tit = document.createElement('div');
+    tit.style.cssText = 'margin-top:16px;font-weight:bold;font-size:0.9rem;color:#6b7690;';
+    tit.textContent = '🗑 Papelera (' + papelera.length + ')';
+    adminLista.appendChild(tit);
+    papelera.forEach(c => {
+      const f = document.createElement('div');
+      f.className = 'admin-fila';
+      f.style.background = '#f3f3f3';
+      f.innerHTML =
+        '<div class="info"><div class="correo">' + c.email + '</div></div>' +
+        '<div class="botones"><button class="btn-restaurar" data-email="' + c.email + '">Restaurar</button>' +
+        '<button class="btn-eliminar-def" data-email="' + c.email + '">Eliminar</button></div>';
+      adminLista.appendChild(f);
+    });
+  }
+  adminLista.querySelectorAll('.btn-restaurar').forEach(btn => {
+    btn.addEventListener('click', async ()=>{
+      await restaurarCliente(btn.dataset.email);
+      renderizarAdmin();
+    });
+  });
+  adminLista.querySelectorAll('.btn-eliminar-def').forEach(btn => {
+    btn.addEventListener('click', async ()=>{
+      if(!confirm('¿Eliminar DEFINITIVAMENTE a ' + btn.dataset.email + '? No se puede recuperar.')) return;
+      await eliminarDefinitivo(btn.dataset.email);
+      renderizarAdmin();
+    });
+  });
+
+  adminLista.querySelectorAll('.btn-renovar').forEach(btn => {
+    btn.addEventListener('click', async ()=>{
+      const cliente = clientes.find(c => c.email === btn.dataset.email);
+      if(!cliente) return;
+      const nuevaFecha = new Date();
+      nuevaFecha.setDate(nuevaFecha.getDate() + 30);
+      const y = nuevaFecha.getFullYear();
+      const m = String(nuevaFecha.getMonth()+1).padStart(2,'0');
+      const d = String(nuevaFecha.getDate()).padStart(2,'0');
+      await guardarCliente(cliente.email, cliente.clave, y+'-'+m+'-'+d);
+      renderizarAdmin();
+    });
+  });
+  adminLista.querySelectorAll('.btn-editar').forEach(btn => {
+    btn.addEventListener('click', async ()=>{
+      const cliente = clientes.find(c => c.email === btn.dataset.email);
+      if(cliente){
+        adminEmailInput.value = cliente.email;
+        adminClaveInput.value = cliente.clave;
+        adminVenceInput.value = cliente.vence;
+        adminForm.style.display = 'block';
+      }
+    });
+  });
+  adminLista.querySelectorAll('.btn-eliminar').forEach(btn => {
+    btn.addEventListener('click', async ()=>{
+      if(!confirm('¿Seguro que querés borrar a ' + btn.dataset.email + '? Va a quedar en la papelera y lo podés restaurar.')) return;
+      await borrarCliente(btn.dataset.email);
+      renderizarAdmin();
+    });
+  });
+}
+
+adminGuardarBtn.addEventListener('click', async ()=>{
+  const email = adminEmailInput.value.trim().toLowerCase();
+  const clave = adminClaveInput.value.trim();
+  const vence = adminVenceInput.value;
+  if(!email || !clave || !vence){
+    adminError.textContent = 'Completá correo, clave y fecha de vencimiento.';
+    return;
+  }
+  adminGuardarBtn.disabled = true;
+  adminGuardarBtn.textContent = 'Guardando...';
+  try{
+    await guardarCliente(email, clave, vence);
+
+    const archivos = {
+      idle: adminVideoSelfie.files[0],
+      derecha: adminVideoDerecha.files[0],
+      izquierda: adminVideoIzquierda.files[0],
+      sonrie: adminVideoSonrie.files[0]
+    };
+    const urls = await subirMediaCliente(email, archivos);
+    if(Object.keys(urls).length > 0){
+      await db.collection('clientes').doc(email).set({ media: urls }, { merge: true });
+    }
+
+    adminEmailInput.value = '';
+    adminClaveInput.value = '';
+    adminVenceInput.value = '';
+    adminVideoSelfie.value = '';
+    adminVideoDerecha.value = '';
+    adminVideoIzquierda.value = '';
+    adminVideoSonrie.value = '';
+    adminError.textContent = '';
+    adminGuardarBtn.disabled = false;
+    adminGuardarBtn.textContent = 'Guardar cliente';
+    adminForm.style.display = 'none';
+    renderizarAdmin();
+    return;
+  }catch(err){
+    adminError.style.color = '';
+    adminError.textContent = 'Error al guardar: ' + (err && err.message ? err.message : 'desconocido');
+  }
+  adminGuardarBtn.disabled = false;
+    adminGuardarBtn.textContent = 'Guardar cliente';
+});
+
+adminCerrarBtn.addEventListener('click', ()=>{
+  localStorage.removeItem('peya_email');
+  adminOverlay.style.display = 'none';
+  loginOverlay.style.display = 'flex';
+  loginEmail.value = '';
+  loginClave.value = '';
+});
+
+async function intentarLogin(){
+  const email = loginEmail.value.trim().toLowerCase();
+  const clave = loginClave.value;
+
+  if(email === ADMIN_EMAIL && clave === ADMIN_CLAVE){
+    localStorage.setItem('peya_email', email);
+    loginOverlay.style.display = 'none';
+    adminOverlay.style.display = 'flex';
+    renderizarAdmin();
+    return;
+  }
+
+  const cliente = await obtenerCliente(email);
+
+  if(!cliente || cliente.clave !== clave){
+    loginError.textContent = 'Correo o clave incorrectos.';
+    return;
+  }
+
+  localStorage.setItem('peya_email', email);
+  loginOverlay.style.display = 'none';
+  chequearPlan(email);
+  aplicarMediaPersonalizada(email);
+  activarMicAlEntrar(true);
+}
+
+loginBtn.addEventListener('click', intentarLogin);
+loginClave.addEventListener('keydown', (e)=>{
+  if(e.key === 'Enter'){ e.preventDefault(); intentarLogin(); }
+});
+
+// Al abrir la app, si ya inició sesión antes en este celular, entra directo
+async function autoLogin(){
+  const emailGuardado = localStorage.getItem('peya_email');
+  if(!emailGuardado) return;
+
+  if(emailGuardado === ADMIN_EMAIL){
+    loginOverlay.style.display = 'none';
+    adminOverlay.style.display = 'flex';
+    renderizarAdmin();
+    return;
+  }
+
+  const cliente = await obtenerCliente(emailGuardado);
+  if(cliente){
+    loginOverlay.style.display = 'none';
+    chequearPlan(emailGuardado);
+    aplicarMediaPersonalizada(emailGuardado);
+    activarMicAlEntrar();
+  }
+}
+autoLogin();
+</script>
+</body>
+</html>
+
